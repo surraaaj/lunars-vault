@@ -50,6 +50,9 @@ export const SHOWCASE_MODELS: OnChainModel[] = [
 ];
 
 // ── Fetch all models from the contract ───────────────────────────────────────
+/** Quick lookup to detect showcase/demo models */
+export const SHOWCASE_HASHES = new Set(SHOWCASE_MODELS.map(m => m.dataHavenHash));
+
 export async function fetchAllModels(provider: ethers.BrowserProvider): Promise<OnChainModel[]> {
     if (!CONTRACT_ADDRESS) return [];
 

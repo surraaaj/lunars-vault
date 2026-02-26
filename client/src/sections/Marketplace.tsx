@@ -9,10 +9,17 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    CONTRACT_ADDRESS, MARKETPLACE_ABI, SHOWCASE_MODELS,
+    CONTRACT_ADDRESS, MARKETPLACE_ABI, SHOWCASE_MODELS, SHOWCASE_HASHES,
     uploadToDataHaven, fetchAllModels, type OnChainModel,
 } from '@/lib/marketplace';
+import type { ModelPersona } from '@/lib/ai';
 import { callGroq, type ChatMessage } from '@/lib/ai';
+
+const PERSONA_MAP: Record<string, ModelPersona> = {
+    'dh://QmX9aK4mNzP2rLvT8sWqBdFhGjCeUoYiI1bR3kMnVw5ZAp': 'code',
+    'dh://QmB7nJ2pKwL4tMxR6yNqCsFiVuHoZAeG9dQ1k8mWvTrY3Es': 'creative',
+    'dh://QmC3fH8qLvP5nMxK9yWsAbTdGiUoJe2R7k4mBnVrY1ZwFg': 'reasoning',
+};
 
 interface MarketplaceProps {
     isConnected: boolean;
@@ -51,8 +58,11 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
     // ── Fetch models from chain ──────────────────────────────────────────────
     const loadModels = useCallback(async () => {
         if (!CONTRACT_ADDRESS || !window.pelagus) {
-            // No contract or wallet — show showcase models
+            // No contract or wallet — show showcase models (auto-unlocked)
             setModels(SHOWCASE_MODELS);
+            const unlocked: Record<string, boolean> = {};
+            SHOWCASE_MODELS.forEach(m => { unlocked[m.dataHavenHash] = true; });
+            setAccessMap(prev => ({ ...prev, ...unlocked }));
             return;
         }
 
@@ -136,6 +146,11 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
     const handleRentModel = async (model: OnChainModel) => {
         const key = model.dataHavenHash;
         setRentError(prev => ({ ...prev, [key]: '' }));
+        // Showcase models unlock instantly
+        if (SHOWCASE_HASHES.has(key)) {
+            setAccessMap(prev => ({ ...prev, [key]: true }));
+            return;
+        }
         if (!address) {
             setRentError(prev => ({ ...prev, [key]: 'Connect your wallet first.' }));
             return;
@@ -179,8 +194,8 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
         setChatResponses(prev => ({ ...prev, [key]: '' }));
 
         try {
-            // Re-verify on-chain access
-            if (address) {
+            // Skip on-chain check for showcase models
+            if (!SHOWCASE_HASHES.has(key) && address) {
                 try {
                     const contract = await getContract();
                     const stillHas = await contract.hasAccess(address, model.dataHavenHash);
@@ -200,7 +215,8 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
             const updatedHistory = [...history, userMsg];
 
             let full = '';
-            await callGroq('reasoning', updatedHistory, (chunk) => {
+            const persona = PERSONA_MAP[key] ?? 'reasoning';
+            await callGroq(persona, updatedHistory, (chunk) => {
                 full += chunk;
                 setChatResponses(prev => ({ ...prev, [key]: full }));
             });
