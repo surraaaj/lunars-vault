@@ -14,9 +14,9 @@ const PRIVATE_KEY =
 export default defineConfig({
     plugins: [hardhatEthers],
     solidity: {
-        version: "0.8.20",
+        version: "0.8.4",
         settings: {
-            evmVersion: "london",
+
             optimizer: {
                 enabled: true,
                 runs: 200,

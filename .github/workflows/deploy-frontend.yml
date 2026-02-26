@@ -38,6 +38,10 @@ jobs:
         run: npm ci
 
       - name: Build
+        env:
+          VITE_CONTRACT_ADDRESS: ${{ secrets.VITE_CONTRACT_ADDRESS }}
+          VITE_PINATA_JWT: ${{ secrets.VITE_PINATA_JWT }}
+          VITE_GROQ_API_KEY: ${{ secrets.VITE_GROQ_API_KEY }}
         run: npm run build
 
       - name: Upload artifact

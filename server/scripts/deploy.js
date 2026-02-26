@@ -43,7 +43,7 @@ async function main() {
         from: qWallet.address,
         data: deployTx.data,
         nonce: nonce,
-        gasLimit: 5000000,
+        gasLimit: 8000000,
         gasPrice: 2000000000,
         chainId: chainId,
         type: 0
