@@ -23,8 +23,10 @@ contract Marketplace {
     mapping(string => AIModel) public models;
 
     /// @notice Tracks whether a user has paid for access to a specific model
-    /// @dev hasAccess[userAddress][dataHavenHash] => bool
     mapping(address => mapping(string => bool)) public hasAccess;
+
+    /// @notice Ordered list of all DataHaven hashes (for enumeration)
+    string[] public modelHashes;
 
     // ─── Events ──────────────────────────────────────────────────────────────────
 
@@ -69,6 +71,8 @@ contract Marketplace {
             pricePerPrompt:  _pricePerPrompt
         });
 
+        modelHashes.push(_dataHavenHash);
+
         emit ModelListed(_dataHavenHash, msg.sender, _modelName, _pricePerPrompt);
     }
 
@@ -104,5 +108,24 @@ contract Marketplace {
         returns (AIModel memory)
     {
         return models[_dataHavenHash];
+    }
+
+    /**
+     * @notice Returns the total number of listed models.
+     */
+    function getModelCount() external view returns (uint256) {
+        return modelHashes.length;
+    }
+
+    /**
+     * @notice Returns the DataHaven hash at a given index.
+     */
+    function getModelHashAtIndex(uint256 _index)
+        external
+        view
+        returns (string memory)
+    {
+        require(_index < modelHashes.length, "Index out of bounds");
+        return modelHashes[_index];
     }
 }
