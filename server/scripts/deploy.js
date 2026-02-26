@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.join(__dirname, "..", ".env") });
 
 async function main() {
-    console.log("🚀 Deploying Marketplace with Hybrid Flow (Orchard)...\n");
+    console.log("🚀 Deploying Marketplace (Hybrid: ethers RPC + quais signing)...\n");
 
     const rpcUrl = "https://orchard.rpc.quai.network/cyprus1";
     const provider = new ethers.JsonRpcProvider(rpcUrl);
@@ -17,23 +17,21 @@ async function main() {
     const pk = process.env.PRIVATE_KEY;
     if (!pk) throw new Error("PRIVATE_KEY not found in .env");
 
-    // Use quais for signing to get correct wire format
     const qWallet = new quais.Wallet(pk);
-    console.log(`📋 Deployer address : ${qWallet.address}`);
+    console.log(`📋 Deployer: ${qWallet.address}`);
 
-    // Manual send to preserve checksum
     const balanceHex = await provider.send("eth_getBalance", [qWallet.address, "latest"]);
     const balance = ethers.toBigInt(balanceHex);
-    console.log(`💰 Deployer balance : ${ethers.formatEther(balance)} QUAI\n`);
+    console.log(`💰 Balance: ${ethers.formatEther(balance)} QUAI\n`);
 
-    if (balance === 0n) throw new Error("Deployer has no balance on Orchard!");
+    if (balance === 0n) throw new Error("No balance!");
 
-    // Load artifact
+    // Load artifact (compiled with evmVersion: london)
     const artifactPath = path.join(__dirname, "..", "artifacts", "contracts", "Marketplace.sol", "Marketplace.json");
     const artifact = JSON.parse(fs.readFileSync(artifactPath, "utf8"));
+    console.log(`📦 Bytecode: ${artifact.bytecode.length} chars (london EVM)`);
 
-    // Prepare deployment transaction with QUAIS factory (handles address grinding for shards)
-    console.log("🏗 Preparing deployment transaction with Quais factory...");
+    // Use quais ContractFactory for shard-compliant address grinding
     const factory = new quais.ContractFactory(artifact.abi, artifact.bytecode, qWallet);
     const deployTx = await factory.getDeployTransaction();
 
@@ -45,50 +43,55 @@ async function main() {
         from: qWallet.address,
         data: deployTx.data,
         nonce: nonce,
-        gasLimit: 4000000,
-        gasPrice: 2000000000, // 2 gwei
+        gasLimit: 5000000,
+        gasPrice: 2000000000,
         chainId: chainId,
         type: 0
     };
 
-    console.log("⏳ Grinding contract address for shard compliance...");
+    console.log("⏳ Grinding address for shard compliance...");
     tx = await factory.grindContractAddress(tx);
 
-    console.log("⏳ Signing with Quais SDK...");
+    console.log("⏳ Signing...");
     const signedTx = await qWallet.signTransaction(tx);
 
-    console.log("📡 Broadcasting raw transaction...");
+    console.log("📡 Broadcasting...");
     try {
         const txHash = await provider.send("eth_sendRawTransaction", [signedTx]);
-        console.log(`✅ Transaction sent! Hash: ${txHash}`);
+        console.log(`✅ TX: ${txHash}`);
+        console.log("⏳ Waiting for confirmation...\n");
 
-        console.log("⏳ Waiting for confirmation (this may take a minute on Orchard)...");
-
-        // Wait for receipt
         let receipt = null;
-        while (!receipt) {
+        for (let i = 0; i < 60; i++) {
             receipt = await provider.getTransactionReceipt(txHash);
-            if (!receipt) {
-                await new Promise(r => setTimeout(r, 5000));
-                process.stdout.write(".");
-            }
+            if (receipt) break;
+            await new Promise(r => setTimeout(r, 5000));
+            process.stdout.write(".");
         }
+
+        if (!receipt) {
+            console.log("\n⏰ Timed out waiting. TX hash:", txHash);
+            console.log("Check back later — the contract may still deploy.");
+            return;
+        }
+
         console.log("\n");
-
         if (receipt.status === 0) {
-            throw new Error("Transaction reverted!");
+            console.log("❌ Transaction reverted!");
+            console.log("Gas used:", receipt.gasUsed.toString());
+            console.log("Block:", receipt.blockNumber);
+            return;
         }
 
-        const contractAddress = receipt.contractAddress;
+        const addr = receipt.contractAddress;
         console.log("─────────────────────────────────────────────────");
         console.log(`🎊 Marketplace deployed!`);
-        console.log(`📍 Contract address : ${contractAddress}`);
+        console.log(`📍 Contract address : ${addr}`);
         console.log("─────────────────────────────────────────────────");
+        console.log(`\nAdd to client/.env.local:`);
+        console.log(`VITE_CONTRACT_ADDRESS=${addr}`);
     } catch (e) {
-        console.error("❌ Deployment failed:", e.message);
-        if (e.message.includes("proto")) {
-            console.error("💡 Hint: Proto error usually means serialization mismatch. Check Quai docs.");
-        }
+        console.error("❌ Failed:", e.message);
     }
 }
 
