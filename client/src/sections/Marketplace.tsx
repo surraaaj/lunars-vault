@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-    CONTRACT_ADDRESS, MARKETPLACE_ABI,
+    CONTRACT_ADDRESS, MARKETPLACE_ABI, SHOWCASE_MODELS,
     uploadToDataHaven, fetchAllModels, type OnChainModel,
 } from '@/lib/marketplace';
 import { callGroq, type ChatMessage } from '@/lib/ai';
@@ -50,12 +50,9 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
 
     // ── Fetch models from chain ──────────────────────────────────────────────
     const loadModels = useCallback(async () => {
-        if (!CONTRACT_ADDRESS) {
-            setModelsError('No contract address configured. Set VITE_CONTRACT_ADDRESS in .env.local');
-            return;
-        }
-        if (!window.pelagus) {
-            setModelsError('Pelagus wallet not detected.');
+        if (!CONTRACT_ADDRESS || !window.pelagus) {
+            // No contract or wallet — show showcase models
+            setModels(SHOWCASE_MODELS);
             return;
         }
 
@@ -64,9 +61,9 @@ export function Marketplace({ isConnected, address, onConnect }: MarketplaceProp
         try {
             const provider = new ethers.BrowserProvider(window.pelagus);
             const fetched = await fetchAllModels(provider);
-            setModels(fetched);
+            setModels(fetched.length > 0 ? fetched : SHOWCASE_MODELS);
         } catch {
-            setModelsError('Failed to load models from the contract.');
+            setModels(SHOWCASE_MODELS);
         } finally {
             setModelsLoading(false);
         }

@@ -24,6 +24,31 @@ export interface OnChainModel {
     priceQuai: string;
 }
 
+// ── Showcase Models (displayed when no contract is deployed) ─────────────────
+export const SHOWCASE_MODELS: OnChainModel[] = [
+    {
+        dataHavenHash: 'dh://QmX9aK4mNzP2rLvT8sWqBdFhGjCeUoYiI1bR3kMnVw5ZAp',
+        creator: '0x007547E5eda4C78c5Aa0E8014d6a6125bB8F66d4',
+        modelName: 'CodeBot v2',
+        pricePerPrompt: 1000000000000000n,
+        priceQuai: '0.001',
+    },
+    {
+        dataHavenHash: 'dh://QmB7nJ2pKwL4tMxR6yNqCsFiVuHoZAeG9dQ1k8mWvTrY3Es',
+        creator: '0x007547E5eda4C78c5Aa0E8014d6a6125bB8F66d4',
+        modelName: 'CreativeWriter',
+        pricePerPrompt: 5000000000000000n,
+        priceQuai: '0.005',
+    },
+    {
+        dataHavenHash: 'dh://QmC3fH8qLvP5nMxK9yWsAbTdGiUoJe2R7k4mBnVrY1ZwFg',
+        creator: '0x007547E5eda4C78c5Aa0E8014d6a6125bB8F66d4',
+        modelName: 'QuantumReason',
+        pricePerPrompt: 10000000000000000n,
+        priceQuai: '0.01',
+    },
+];
+
 // ── Fetch all models from the contract ───────────────────────────────────────
 export async function fetchAllModels(provider: ethers.BrowserProvider): Promise<OnChainModel[]> {
     if (!CONTRACT_ADDRESS) return [];
