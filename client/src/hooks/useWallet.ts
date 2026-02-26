@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { WalletState } from '@/types';
 
-const QUAI_CYPRUS1_CHAIN_ID = '0x1c72';
+const QUAI_CYPRUS1_CHAIN_ID = '0x3a98'; // Orchard Cyprus-1 (15000)
+const LOCALHOST_CHAIN_ID = '0x7a69'; // 31337 in hex
 
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
@@ -12,16 +13,20 @@ export function useWallet() {
     error: null,
   });
 
+  const getProvider = useCallback(() => {
+    if (typeof window.pelagus !== 'undefined') return window.pelagus;
+    if (typeof window.ethereum !== 'undefined') return window.ethereum;
+    return null;
+  }, []);
+
   const checkConnection = useCallback(async () => {
-    if (typeof window.pelagus === 'undefined') {
-      setState(prev => ({ ...prev, error: 'Pelagus not installed' }));
-      return;
-    }
+    const provider = getProvider();
+    if (!provider) return;
 
     try {
-      const accounts = await window.pelagus.request({ method: 'eth_accounts' });
-      const chainId = await window.pelagus.request({ method: 'eth_chainId' });
-      
+      const accounts = await provider.request({ method: 'eth_accounts' });
+      const chainId = await provider.request({ method: 'eth_chainId' });
+
       if (accounts.length > 0) {
         setState({
           isConnected: true,
@@ -34,13 +39,14 @@ export function useWallet() {
     } catch (err) {
       console.error('Error checking connection:', err);
     }
-  }, []);
+  }, [getProvider]);
 
   useEffect(() => {
     checkConnection();
+    const provider = getProvider();
 
-    if (window.pelagus) {
-      window.pelagus.on('accountsChanged', (accounts: string[]) => {
+    if (provider) {
+      const handleAccounts = (accounts: string[]) => {
         if (accounts.length === 0) {
           setState({
             isConnected: false,
@@ -56,49 +62,51 @@ export function useWallet() {
             address: accounts[0],
           }));
         }
-      });
+      };
 
-      window.pelagus.on('chainChanged', (chainId: string) => {
+      const handleChain = (chainId: string) => {
         setState(prev => ({ ...prev, chainId }));
         window.location.reload();
-      });
-    }
+      };
 
-    return () => {
-      if (window.pelagus) {
-        window.pelagus.removeAllListeners('accountsChanged');
-        window.pelagus.removeAllListeners('chainChanged');
-      }
-    };
-  }, [checkConnection]);
+      provider.on('accountsChanged', handleAccounts);
+      provider.on('chainChanged', handleChain);
+
+      return () => {
+        provider.removeListener('accountsChanged', handleAccounts);
+        provider.removeListener('chainChanged', handleChain);
+      };
+    }
+  }, [checkConnection, getProvider]);
 
   const connect = useCallback(async () => {
-    if (typeof window.pelagus === 'undefined') {
-      setState(prev => ({ ...prev, error: 'Please install Pelagus' }));
-      window.open('https://pelaguswallet.io/', '_blank');
+    const provider = getProvider();
+    if (!provider) {
+      setState(prev => ({ ...prev, error: 'Please install Pelagus or MetaMask' }));
       return;
     }
 
     setState(prev => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const accounts = await window.pelagus.request({
+      const accounts = await provider.request({
         method: 'eth_requestAccounts',
       });
-      
-      const chainId = await window.pelagus.request({ method: 'eth_chainId' });
-      
-      // Check if on correct network
-      if (chainId !== QUAI_CYPRUS1_CHAIN_ID) {
+
+      const chainId = await provider.request({ method: 'eth_chainId' });
+
+      // Switch to Quai Cyprus-1 if on wrong network AND using Pelagus
+      // Or allow 31337 if using localhost
+      if (chainId !== QUAI_CYPRUS1_CHAIN_ID && chainId !== LOCALHOST_CHAIN_ID) {
         try {
-          await window.pelagus.request({
+          await provider.request({
             method: 'wallet_switchEthereumChain',
             params: [{ chainId: QUAI_CYPRUS1_CHAIN_ID }],
           });
         } catch (switchError: any) {
-          // If network doesn't exist, add it
-          if (switchError.code === 4902) {
-            await window.pelagus.request({
+          // If network doesn't exist AND using Pelagus, add it
+          if (switchError.code === 4902 && typeof window.pelagus !== 'undefined') {
+            await provider.request({
               method: 'wallet_addEthereumChain',
               params: [
                 {
@@ -134,7 +142,21 @@ export function useWallet() {
     }
   }, []);
 
-  const disconnect = useCallback(() => {
+  const disconnect = useCallback(async () => {
+    const provider = getProvider();
+    if (provider) {
+      try {
+        await provider.request({
+          method: 'wallet_revokePermissions',
+          params: [{ eth_accounts: {} }],
+        });
+      } catch (err) {
+        // Many wallets (including some versions of MetaMask/Pelagus) don't support revoking permissions programmatically.
+        // We catch the error silently since we still want to clear the local state below either way.
+        console.warn('wallet_revokePermissions not supported or failed:', err);
+      }
+    }
+
     setState({
       isConnected: false,
       address: null,
@@ -142,24 +164,20 @@ export function useWallet() {
       isConnecting: false,
       error: null,
     });
-  }, []);
-
-  const truncateAddress = (address: string): string => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
+  }, [getProvider]);
 
   return {
     ...state,
     connect,
     disconnect,
-    truncateAddress,
-    isCorrectNetwork: state.chainId === QUAI_CYPRUS1_CHAIN_ID,
+    isCorrectNetwork: state.chainId === QUAI_CYPRUS1_CHAIN_ID || state.chainId === LOCALHOST_CHAIN_ID,
   };
 }
 
-// Extend Window interface for Pelagus
+// Extend Window interface
 declare global {
   interface Window {
     pelagus?: any;
+    ethereum?: any;
   }
 }

@@ -23,7 +23,7 @@ export function VerificationSearch({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hash.trim() || isVerifying) return;
-    
+
     setHasSearched(true);
     await onVerify(hash);
   };
@@ -78,11 +78,10 @@ export function VerificationSearch({
         {/* Result Display */}
         {hasSearched && verificationResult && (
           <div
-            className={`rounded-lg p-4 border slide-in ${
-              verificationResult.found
+            className={`rounded-lg p-4 border slide-in ${verificationResult.found
                 ? 'bg-emerald-500/5 border-emerald-500/20'
                 : 'bg-destructive/5 border-destructive/20'
-            }`}
+              }`}
           >
             {verificationResult.found && verificationResult.asset ? (
               <div className="space-y-3">

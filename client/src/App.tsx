@@ -4,6 +4,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Header } from '@/sections/Header';
 import { ParticleBackground } from '@/sections/ParticleBackground';
 import { StagingZone } from '@/sections/StagingZone';
+import { Marketplace } from '@/sections/Marketplace';
 import { ImmutableLedger } from '@/sections/ImmutableLedger';
 import { VerificationSearch } from '@/sections/VerificationSearch';
 import { Footer } from '@/sections/Footer';
@@ -32,6 +33,7 @@ function App() {
         address={wallet.address}
         isConnecting={wallet.isConnecting}
         onConnect={wallet.connect}
+        onDisconnect={wallet.disconnect}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
@@ -49,6 +51,13 @@ function App() {
             onVaultAsset={handleVaultAsset}
           />
         </div>
+
+        {/* AI Model Marketplace */}
+        <Marketplace
+          isConnected={wallet.isConnected}
+          address={wallet.address}
+          onConnect={wallet.connect}
+        />
 
         {/* Immutable Ledger */}
         <ImmutableLedger

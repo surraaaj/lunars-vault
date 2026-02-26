@@ -1,8 +1,9 @@
 import { useState, useCallback } from 'react';
-import { Upload, File, X, Loader2, CheckCircle } from 'lucide-react';
+import { Upload, File as FileIcon, X, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { TransactionState } from '@/types';
+import { formatFileSize } from '@/lib/utils';
 
 interface StagingZoneProps {
   isConnected: boolean;
@@ -24,6 +25,20 @@ export function StagingZone({
   const [preview, setPreview] = useState<string | null>(null);
   const [assetName, setAssetName] = useState('');
 
+  const handleFile = useCallback((selectedFile: File) => {
+    setFile(selectedFile);
+
+    if (selectedFile.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setPreview(e.target?.result as string);
+      };
+      reader.readAsDataURL(selectedFile);
+    } else {
+      setPreview(null);
+    }
+  }, []);
+
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -43,27 +58,13 @@ export function StagingZone({
       const droppedFile = e.dataTransfer.files[0];
       handleFile(droppedFile);
     }
-  }, []);
+  }, [handleFile]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       handleFile(e.target.files[0]);
     }
-  }, []);
-
-  const handleFile = (selectedFile: File) => {
-    setFile(selectedFile);
-    
-    if (selectedFile.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setPreview(e.target?.result as string);
-      };
-      reader.readAsDataURL(selectedFile);
-    } else {
-      setPreview(null);
-    }
-  };
+  }, [handleFile]);
 
   const clearFile = () => {
     setFile(null);
@@ -79,13 +80,6 @@ export function StagingZone({
     }
   };
 
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-  };
 
   const isProcessing = transactionState === 'uploading' || transactionState === 'confirming';
   const isSuccess = transactionState === 'success';
@@ -93,14 +87,24 @@ export function StagingZone({
   return (
     <section className="relative min-h-screen flex items-center justify-center pt-14 overflow-hidden">
       <div className="relative z-10 w-full max-w-lg mx-auto px-6 py-16">
+        {/* Badge */}
+        <div className="flex justify-center mb-6">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-foreground/6 border border-border text-[11px] font-semibold text-muted-foreground tracking-wider uppercase">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            DataHaven × Quai Network
+          </span>
+        </div>
+
         {/* Headline */}
-        <h1 className="text-3xl sm:text-4xl font-medium text-center text-foreground mb-3 tracking-tight">
+        <h1 className="text-5xl sm:text-6xl font-extrabold text-center text-foreground mb-4 tracking-tight leading-none">
           Secure Your Legacy
         </h1>
 
         {/* Subheadline */}
         <p className="text-sm text-center text-muted-foreground mb-10 max-w-sm mx-auto leading-relaxed">
-          Vault your intellectual property on Quai. Immutable. Verifiable. Permanent.
+          Vault intellectual property on Quai Network.
+          <br />
+          <span className="font-medium text-foreground/70">Immutable. Verifiable. Permanent.</span>
         </p>
 
         {/* Upload Card */}
@@ -111,11 +115,10 @@ export function StagingZone({
               onDragLeave={handleDrag}
               onDragOver={handleDrag}
               onDrop={handleDrop}
-              className={`relative border border-dashed rounded-lg p-10 text-center transition-all duration-200 ${
-                dragActive
-                  ? 'border-foreground/30 bg-muted'
-                  : 'border-border bg-muted/30 hover:border-foreground/20 hover:bg-muted/50'
-              }`}
+              className={`relative border border-dashed rounded-lg p-10 text-center transition-all duration-200 ${dragActive
+                ? 'border-foreground/30 bg-muted'
+                : 'border-border bg-muted/30 hover:border-foreground/20 hover:bg-muted/50'
+                }`}
             >
               <input
                 type="file"
@@ -151,7 +154,7 @@ export function StagingZone({
                   />
                 ) : (
                   <div className="w-14 h-14 rounded-md bg-muted flex items-center justify-center">
-                    <File className="w-6 h-6 text-muted-foreground" />
+                    <FileIcon className="w-6 h-6 text-muted-foreground" />
                   </div>
                 )}
                 <div className="flex-1 min-w-0">
@@ -183,11 +186,10 @@ export function StagingZone({
               <Button
                 onClick={handleVault}
                 disabled={!isConnected || isProcessing}
-                className={`w-full btn-lift rounded-lg h-10 text-sm font-medium transition-all ${
-                  isSuccess
-                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
-                    : 'bg-foreground text-background hover:bg-foreground/90'
-                }`}
+                className={`w-full btn-lift rounded-lg h-10 text-sm font-medium transition-all ${isSuccess
+                  ? 'bg-emerald-500 hover:bg-emerald-600 text-white'
+                  : 'bg-foreground text-background hover:bg-foreground/90'
+                  }`}
               >
                 {isProcessing ? (
                   <span className="flex items-center justify-center gap-2">
